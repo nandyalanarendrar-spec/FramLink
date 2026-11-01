@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #f0fdf4;
+  --color-brand-100: #dcfce7;
+  --color-brand-500: #22c55e;
+  --color-brand-600: #16a34a;
+  --color-brand-700: #15803d;
+  --color-brand-800: #166534;
+  --color-brand-900: #14532d;
+
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-fade-up: fade-up 0.5s ease-out both;
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0) rotate(-4deg); }
+    50% { transform: translateY(-22px) rotate(4deg); }
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+body {
+  @apply bg-slate-50 text-slate-800 antialiased;
+  font-family: system-ui, -apple-system, 'Segoe UI', 'Noto Sans Telugu', 'Nirmala UI', 'Gautami', Roboto, sans-serif;
+}
+
+@layer components {
+  .input {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-outline {
+    @apply inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100;
+  }
+}
+
+/* Telugu: negative/extra letter-spacing breaks conjunct letters, and the tall glyphs need more line height */
+html:is([lang='te'], [lang='hi']) *,
+html:is([lang='te'], [lang='hi']) *::before,
+html:is([lang='te'], [lang='hi']) *::after {
+  letter-spacing: normal !important;
+}
+html:is([lang='te'], [lang='hi']) h1,
+html:is([lang='te'], [lang='hi']) h2,
+html:is([lang='te'], [lang='hi']) h3 {
+  line-height: 1.4 !important;
+}
+html:is([lang='te'], [lang='hi']) button,
+html:is([lang='te'], [lang='hi']) .btn-primary,
+html:is([lang='te'], [lang='hi']) .btn-outline {
+  line-height: 1.5;
+}
