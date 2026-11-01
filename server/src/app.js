@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
+import mongoose from 'mongoose';
 import authRoutes from './routes/authRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import cropRoutes from './routes/cropRoutes.js';
@@ -67,7 +68,8 @@ app.use('/uploads/crops', express.static(CROP_DIR, { index: false, dotfiles: 'de
 // A general ceiling for the whole API. Login/register have their own, stricter limits.
 app.use('/api', rateLimit({ windowMs: 60 * 1000, limit: Number(process.env.API_RATE_LIMIT) || 600, standardHeaders: true, legacyHeaders: false, message: { message: 'Too many requests. Please slow down.' } }));
 
-app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+// Backend status: the server is up, and whether the database connection is open
+app.get('/api/health', (_req, res) => res.json({ status: 'ok', database: mongoose.connection.readyState === 1 ? 'connected' : 'not connected' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/crops', cropRoutes);
@@ -84,6 +86,19 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/demands', demandRoutes);
+
+// In development the backend is only an API. Say so, and point at the website, instead of showing an error page.
+if (!serveClient) {
+  app.get('/', (_req, res) =>
+    res.json({
+      service: 'FarmLink API',
+      status: 'running',
+      note: 'This is the backend (data only). The website is the frontend.',
+      website: process.env.CLIENT_URL || 'http://localhost:5173',
+      health: '/api/health',
+    })
+  );
+}
 
 // Production: one server serves the built React app too (same origin, so the login cookie needs no CORS)
 if (serveClient) {

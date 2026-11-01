@@ -10,6 +10,8 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 process.env.NODE_ENV = 'test';
+// Tests must never send real email, whatever is in the real .env (the mail tests set their own stand-in service)
+for (const k of ['BREVO_API_KEY', 'BREVO_API_URL', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM']) delete process.env[k];
 process.env.DISABLE_JOBS = 'true';
 process.env.AUTH_RATE_LIMIT = '100000';
 process.env.API_RATE_LIMIT = '100000';
