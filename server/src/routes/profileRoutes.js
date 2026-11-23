@@ -4,10 +4,12 @@ import { getProfile, submitVerification, addDocuments, removeDocument, updateVeh
 import { documents } from '../utils/files.js';
 
 const router = Router();
-router.use(protect, requireEmailVerified, authorize('farmer', 'buyer', 'transporter'));
+router.use(protect, requireEmailVerified, authorize('farmer', 'buyer', 'transporter', 'admin'));
 
 router.get('/', getProfile);
 router.put('/account', updateAccount);
+
+router.use(authorize('farmer', 'buyer', 'transporter'));
 router.put('/basic', updateBasic);
 router.post('/unlock', unlockForEdit); // verified users reopen their ID details (needs re-verification)
 router.put('/verification', submitVerification);

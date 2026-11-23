@@ -76,6 +76,7 @@ export default function Profile() {
   const [docBusy, setDocBusy] = useState(false)
 
   const role = user?.role ?? 'farmer'
+  const isAdmin = role === 'admin'
   const fields = fieldsByRole[role] ?? []
 
   const load = useCallback(async () => {
@@ -187,16 +188,16 @@ export default function Profile() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold">{t('My Profile')}</h1>
-        <p className="text-sm text-slate-500">{t('Your account and verification details.')}</p>
+        <p className="text-sm text-slate-500">{isAdmin ? t('Your account details.') : t('Your account and verification details.')}</p>
       </div>
 
-      <section className={`flex gap-3 rounded-xl border p-4 text-sm ${ui.cls}`}>
+      {!isAdmin && <section className={`flex gap-3 rounded-xl border p-4 text-sm ${ui.cls}`}>
         <StatusIcon className="mt-0.5 shrink-0" size={18} />
         <div>
           <p className="font-semibold">{heading}</p>
           <p>{message}</p>
         </div>
-      </section>
+      </section>}
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6">
         <h2 className="font-semibold">{t('Account')}</h2>
@@ -216,9 +217,9 @@ export default function Profile() {
         <EmailChange onChanged={() => Promise.all([load(), refresh()])} />
       </section>
 
-      {locked && <BasicEditor role={role} values={form} onSaved={load} />}
+      {!isAdmin && locked && <BasicEditor role={role} values={form} onSaved={load} />}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6">
+      {!isAdmin && <section className="rounded-2xl border border-slate-200 bg-white p-6">
         <h2 className="font-semibold">{t('ID proof document')} <span className="text-red-500">*</span></h2>
         <p className="mt-1 text-sm text-slate-500">{t('Upload a clear photo or PDF of the ID you selected below. Only you and FarmLink admins can open it.')}</p>
         <ul className="mt-3 space-y-2">
@@ -237,9 +238,9 @@ export default function Profile() {
             <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="hidden" onChange={onDocs} disabled={docBusy} />
           </label>
         )}
-      </section>
+      </section>}
 
-      <form onSubmit={onSubmit} className="rounded-2xl border border-slate-200 bg-white p-6">
+      {!isAdmin && <form onSubmit={onSubmit} className="rounded-2xl border border-slate-200 bg-white p-6">
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-semibold">{t('Verification details')}</h2>
           {locked && <span className="inline-flex items-center gap-1 text-xs text-slate-500"><Lock size={14} /> {t('Locked after verification')}</span>}
@@ -279,9 +280,9 @@ export default function Profile() {
           </div>
         )}
         <p className="mt-3 text-xs text-slate-500">{t('Your details are visible only to you and FarmLink admins.')}</p>
-      </form>
+      </form>}
 
-      <MyRating />
+      {!isAdmin && <MyRating />}
       <PasswordCard />
     </div>
   )

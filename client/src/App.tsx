@@ -51,7 +51,7 @@ export default function App() {
           <Route path={`/${role}`} element={<PortalLayout />}>
             {/* Always available, even before admin verification */}
             <Route index element={<Dashboard />} />
-            {role !== 'admin' && <Route path="profile" element={<Profile />} />}
+            <Route path="profile" element={<Profile />} />
             <Route path="notifications" element={<Notifications />} />
             {role === 'admin' && <Route path="verifications" element={<Verifications />} />}
             {role === 'admin' && <Route path="prices" element={<MarketPrices />} />}

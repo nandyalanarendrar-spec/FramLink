@@ -51,7 +51,7 @@ const docList = (u) => (u.documents ?? []).map((d) => ({ id: d._id, name: d.name
 
 async function detailsFor(user) {
   const out = {};
-  FIELDS[user.role].forEach((k) => (out[k] = user[k]));
+  (FIELDS[user.role] ?? []).forEach((k) => (out[k] = user[k]));
   if (user.role === 'farmer') {
     const p = await FarmerProfile.findOne({ user: user._id }).lean();
     Object.assign(out, { farmSizeAcres: p?.farmSizeAcres, farmAddress: p?.farmAddress, district: p?.district, village: p?.village });

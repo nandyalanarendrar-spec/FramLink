@@ -78,6 +78,23 @@ describe('ratings between farmers, buyers and transporters', () => {
 });
 
 describe('editing profiles', () => {
+  it('admins can view and update their own account details in the database', async () => {
+    const client = await admin();
+    const profile = await client.get('/api/profile');
+    assert.equal(profile.status, 200);
+    assert.equal(profile.data.account.name, 'Test Admin');
+
+    const updated = await client.put('/api/profile/account', { name: 'Updated Admin', phone: '9876599998' });
+    assert.equal(updated.status, 200);
+    assert.deepEqual(updated.data.account, { name: 'Updated Admin', phone: '9876599998' });
+
+    const saved = await db().collection('users').findOne({ email: 'admin@test.local' });
+    assert.equal(saved.name, 'Updated Admin');
+    assert.equal(saved.phone, '9876599998');
+    assert.equal((await client.get('/api/auth/me')).data.user.name, 'Updated Admin');
+    assert.equal((await client.put('/api/profile/verification', {})).status, 403);
+  });
+
   it('password: wrong current, weak new and same-as-old are refused; the new one works', async () => {
     const p = await person('buyer');
     const c = p.client;

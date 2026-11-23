@@ -57,6 +57,7 @@ const navByRole: Record<Role, NavItem[]> = {
     { to: '/admin/notifications', label: T('Notifications'), icon: Bell },
     { to: '/admin/users', label: T('Users'), icon: Users },
     { to: '/admin/listings', label: T('Listings'), icon: Sprout },
+    { to: '/admin/profile', label: T('My Profile'), icon: User },
   ],
 }
 
