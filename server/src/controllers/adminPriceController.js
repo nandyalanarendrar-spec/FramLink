@@ -66,5 +66,14 @@ export const remove = asyncHandler(async (req, res) => {
 });
 
 export const importPrices = asyncHandler(async (_req, res) => {
-  res.json(await runPriceImport('manual'));
+  try {
+    res.json({ ok: true, ...(await runPriceImport('manual')) });
+  } catch (err) {
+    // data.gov.in is geo-blocked from Render's US servers.
+    // Return a structured response so the admin UI can show a helpful command.
+    if (err.message?.includes('data.gov.in') || err.message?.includes('fetch failed')) {
+      return res.status(503).json({ ok: false, geoBlocked: true, message: err.message });
+    }
+    throw err;
+  }
 });

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { DownloadCloud, Trash2 } from 'lucide-react'
+import { CheckCircle, Copy, DownloadCloud, Terminal, Trash2 } from 'lucide-react'
 import { api, errorMessage } from '../../api/client'
 import { fmtDate, inr } from '../../api/crops'
 import { sourceLabel } from '../../api/prices'
@@ -16,6 +16,7 @@ interface Status {
 }
 
 const empty = { crop: '', market: '', district: '', minPrice: '', maxPrice: '', modalPrice: '', date: new Date().toISOString().slice(0, 10) }
+const LOCAL_CMD = 'cd server && npm run import:prices'
 
 export default function MarketPrices() {
   const [status, setStatus] = useState<Status | null>(null)
@@ -26,6 +27,8 @@ export default function MarketPrices() {
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [geoBlocked, setGeoBlocked] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const load = useCallback(async () => {
     const [s, l] = await Promise.all([api.get('/admin/prices/status'), api.get('/admin/prices')])
@@ -35,7 +38,6 @@ export default function MarketPrices() {
 
   useEffect(() => {
     load().catch((err) => setError(errorMessage(err)))
-    // the district list is shared with farmers; admins read it from the same data
     api.get('/admin/prices/districts').then(({ data }) => setDistricts(data.districts)).catch(() => {})
   }, [load])
 
@@ -55,11 +57,15 @@ export default function MarketPrices() {
   }
 
   async function runImport() {
-    setError(''); setNotice(''); setImporting(true)
+    setError(''); setNotice(''); setGeoBlocked(false); setImporting(true)
     try {
       const { data } = await api.post('/admin/prices/import')
-      setNotice(`Imported ${data.saved} price rows (${data.fetched} records fetched).`)
-      await load()
+      if (data.geoBlocked) {
+        setGeoBlocked(true)
+      } else {
+        setNotice(`Imported ${data.saved} price rows (${data.fetched} records fetched).`)
+        await load()
+      }
     } catch (err) { setError(errorMessage(err)) } finally { setImporting(false) }
   }
 
@@ -68,11 +74,17 @@ export default function MarketPrices() {
     try { await api.delete(`/admin/prices/${r._id}`); await load() } catch (err) { setError(errorMessage(err)) }
   }
 
+  function copyCmd() {
+    navigator.clipboard.writeText(LOCAL_CMD)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Market prices</h1>
-        <p className="text-sm text-slate-500">Real mandi prices that power farmers’ Price Comparison. Only enter prices you have read from a real market or government source.</p>
+        <p className="text-sm text-slate-500">Real mandi prices that power farmers' Price Comparison. Only enter prices you have read from a real market or government source.</p>
       </div>
 
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5">
@@ -86,8 +98,41 @@ export default function MarketPrices() {
             </p>
           )}
         </div>
-        <button className="btn-primary gap-2" disabled={!status?.agmarknetConfigured || importing} onClick={runImport}><DownloadCloud size={18} /> {importing ? 'Importing…' : 'Import latest AP mandi prices'}</button>
+        <button className="btn-primary gap-2" disabled={!status?.agmarknetConfigured || importing} onClick={runImport}>
+          <DownloadCloud size={18} /> {importing ? 'Importing…' : 'Import latest AP mandi prices'}
+        </button>
       </section>
+
+      {/* Geo-block panel: shown when Render's US servers cannot reach data.gov.in */}
+      {geoBlocked && (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+          <div className="flex items-start gap-3">
+            <Terminal size={22} className="mt-0.5 shrink-0 text-amber-700" />
+            <div className="flex-1">
+              <p className="font-semibold text-amber-900">data.gov.in is not reachable from Render's servers</p>
+              <p className="mt-1 text-sm text-amber-800">
+                India's government API blocks foreign cloud servers (US/EU). Run this one command on your <b>local machine</b> — it fetches prices from data.gov.in and saves them directly to the database:
+              </p>
+              <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-900 px-4 py-3">
+                <code className="flex-1 font-mono text-sm text-amber-100">{LOCAL_CMD}</code>
+                <button
+                  onClick={copyCmd}
+                  className="flex shrink-0 items-center gap-1.5 rounded-md bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600"
+                >
+                  {copied ? <><CheckCircle size={14} /> Copied!</> : <><Copy size={14} /> Copy</>}
+                </button>
+              </div>
+              <p className="mt-3 text-xs text-amber-700">After running the command, click <b>Refresh</b> below to see the updated price count.</p>
+              <button
+                onClick={() => { setGeoBlocked(false); load() }}
+                className="mt-2 text-sm font-semibold text-amber-800 underline hover:text-amber-900"
+              >
+                ↻ Refresh price count
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       {notice && <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">{notice}</p>}
