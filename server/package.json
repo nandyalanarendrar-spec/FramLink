@@ -7,7 +7,8 @@
     "test": "node --test --test-concurrency=1 tests/*.test.js",
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "seed:admin": "node src/scripts/seedAdmin.js"
+    "seed:admin": "node src/scripts/seedAdmin.js",
+    "import:prices": "node src/scripts/importPricesLocally.js"
   },
   "keywords": [],
   "author": "",
