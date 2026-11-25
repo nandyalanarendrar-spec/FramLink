@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle, BadgeCheck, ExternalLink, MapPin, Navigation,
-  TrendingDown, TrendingUp, Minus, Star, Zap, Route,
+  TrendingDown, TrendingUp, Minus, Star, Zap, Route, Edit2, RotateCcw, Check,
 } from 'lucide-react'
 import { api, errorMessage } from '../../api/client'
 import { fmtDate, inr } from '../../api/crops'
@@ -16,7 +16,12 @@ interface MarketRow {
 }
 interface Rec { market: string; district: string; netRevenue: number | null; distanceKm: number | null; reason: string }
 interface NearbyData {
-  crop: string; quantity: number; farmerDistrict: string | null; days: number
+  crop: string; quantity: number
+  farmerDistrict: string | null
+  profileDistrict: string | null
+  isCustomLocation: boolean
+  village: string | null
+  days: number
   markets: MarketRow[]; byDistance: MarketRow[]
   recommendation: { bestValue: Rec | null; nearest: Rec | null; smartPick: Rec | null }
   weeklyInsights: { risingCount: number; fallingCount: number; totalMarkets: number; avgModal: number | null }
@@ -42,8 +47,8 @@ function Sparkline({ points, rising }: { points: TrendPoint[]; rising: boolean |
   )
 }
 
-function googleMapsUrl(farmerDistrict: string | null, market: string, district: string) {
-  const origin = farmerDistrict ? `${farmerDistrict}, Andhra Pradesh, India` : 'Andhra Pradesh, India'
+function googleMapsUrl(originLocation: string | null, market: string, district: string) {
+  const origin = originLocation ? `${originLocation}, Andhra Pradesh, India` : 'Andhra Pradesh, India'
   const dest = `${market}, ${district}, Andhra Pradesh, India`
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}&travelmode=driving`
 }
@@ -68,6 +73,7 @@ function RecommendCard({ rec, label, icon: Icon, color }: { rec: Rec; label: str
 export default function NearbyMarkets() {
   const { t } = useTranslation()
   const [crops, setCrops] = useState<{ crop: string; markets: number }[]>([])
+  const [districts, setDistricts] = useState<string[]>([])
   const [crop, setCrop] = useState('')
   const [quantity, setQuantity] = useState('1000')
   const [days, setDays] = useState('7')
@@ -77,9 +83,21 @@ export default function NearbyMarkets() {
   const [error, setError] = useState('')
   const [ready, setReady] = useState(false)
 
+  // Location customization state
+  const [customDistrict, setCustomDistrict] = useState('')
+  const [specificPlace, setSpecificPlace] = useState('')
+  const [isEditingLocation, setIsEditingLocation] = useState(false)
+
   useEffect(() => {
-    api.get('/prices/crops')
-      .then(({ data: d }) => { setCrops(d.crops); if (d.crops[0]) setCrop(d.crops[0].crop) })
+    Promise.all([
+      api.get('/prices/crops'),
+      api.get('/prices/districts'),
+    ])
+      .then(([cropsRes, distRes]) => {
+        setCrops(cropsRes.data.crops)
+        setDistricts(distRes.data.districts)
+        if (cropsRes.data.crops[0]) setCrop(cropsRes.data.crops[0].crop)
+      })
       .catch((err) => setError(errorMessage(err)))
       .finally(() => setReady(true))
   }, [])
@@ -89,13 +107,15 @@ export default function NearbyMarkets() {
     setLoading(true); setError('')
     const timer = setTimeout(async () => {
       try {
-        const { data: d } = await api.get('/prices/nearby', { params: { crop, quantity, days } })
+        const params: Record<string, string> = { crop, quantity, days }
+        if (customDistrict) params.from = customDistrict
+        const { data: d } = await api.get('/prices/nearby', { params })
         setData(d)
       } catch (err) { setError(errorMessage(err)) }
       finally { setLoading(false) }
     }, 400)
     return () => clearTimeout(timer)
-  }, [crop, quantity, days])
+  }, [crop, quantity, days, customDistrict])
 
   if (ready && crops.length === 0) {
     return (
@@ -116,6 +136,12 @@ export default function NearbyMarkets() {
 
   const { recommendation: rec, weeklyInsights: wi } = data ?? { recommendation: {}, weeklyInsights: {} }
 
+  // Effective location for navigation: specific place if given, else the active district
+  const effectiveDistrict = customDistrict || data?.farmerDistrict || data?.profileDistrict || ''
+  const effectiveNavOrigin = specificPlace
+    ? `${specificPlace}, ${effectiveDistrict}`
+    : effectiveDistrict
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -125,6 +151,114 @@ export default function NearbyMarkets() {
           {t("Can't sell fully on FarmLink? Find the best local mandi for your crop — compare prices, distance, and 7-day trends, then navigate directly.")}
         </p>
       </div>
+
+      {/* Farm Location Selection Bar */}
+      <section className="rounded-2xl border border-brand-200 bg-brand-50/50 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-100 text-brand-700">
+              <MapPin size={20} />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Farming / Selling Location</span>
+                {data?.isCustomLocation ? (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
+                    Custom Location
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-bold text-brand-800">
+                    Default (From Profile)
+                  </span>
+                )}
+              </div>
+              <p className="font-bold text-slate-800">
+                {effectiveDistrict || t('Checking profile…')}
+                {specificPlace && <span className="font-normal text-slate-500"> ({specificPlace})</span>}
+                {data?.village && !specificPlace && !data.isCustomLocation && (
+                  <span className="font-normal text-slate-500"> · {data.village}</span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {!isEditingLocation ? (
+              <button
+                type="button"
+                onClick={() => setIsEditingLocation(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-brand-300 bg-white px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-sm transition hover:bg-brand-50"
+              >
+                <Edit2 size={13} /> Change Location
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsEditingLocation(false)}
+                className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-700"
+              >
+                <Check size={14} /> Done
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Location Edit Panel */}
+        {isEditingLocation && (
+          <div className="mt-4 border-t border-brand-200/80 pt-4">
+            <p className="text-xs text-slate-600">
+              Harvesting or storing in another area? Choose your harvest district and optional mandal/village below to calculate distance and driving route from that location:
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-700">Harvest District</label>
+                <select
+                  className="input"
+                  value={customDistrict}
+                  onChange={(e) => setCustomDistrict(e.target.value)}
+                >
+                  <option value="">
+                    {data?.profileDistrict ? `Profile District: ${data.profileDistrict} (Default)` : 'Select District…'}
+                  </option>
+                  {districts.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-700">Specific Village / Mandal / Town (Optional)</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="e.g. Dharmavaram, Madakasira..."
+                  value={specificPlace}
+                  onChange={(e) => setSpecificPlace(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-end gap-2">
+                {customDistrict && (
+                  <button
+                    type="button"
+                    onClick={() => { setCustomDistrict(''); setSpecificPlace('') }}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  >
+                    <RotateCcw size={12} /> Reset to Profile
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsEditingLocation(false)}
+                  className="rounded-lg bg-brand-700 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-800"
+                >
+                  Apply Location
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* Controls */}
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -204,7 +338,7 @@ export default function NearbyMarkets() {
           {!data.farmerDistrict && (
             <p className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
               <AlertTriangle size={16} className="shrink-0" />
-              {t('Your district was not found in your profile. Distance and transport estimates are unavailable. Update your profile to enable them.')}
+              {t('Your district was not found. Please click "Change Location" above to choose your harvest district.')}
             </p>
           )}
 
@@ -221,7 +355,7 @@ export default function NearbyMarkets() {
                 const isSmart = rec.smartPick?.market === m.market
                 const isRising = (m.trendPct ?? 0) > 2
                 const isFalling = (m.trendPct ?? 0) < -2
-                const mapsUrl = googleMapsUrl(data.farmerDistrict, m.market, m.district)
+                const mapsUrl = googleMapsUrl(effectiveNavOrigin, m.market, m.district)
                 return (
                   <article key={`${m.market}-${m.district}`} className={`relative rounded-2xl border bg-white p-4 ${isSmart ? 'border-yellow-300 ring-2 ring-yellow-200' : 'border-slate-200'}`}>
                     {isSmart && (
@@ -295,7 +429,7 @@ export default function NearbyMarkets() {
 
           {/* How we calculate note */}
           <p className="text-xs text-slate-400">
-            * Distance is estimated as road distance (straight line × 1.3) between district centres. Transport cost = ₹12/km × vehicles needed. Net revenue = gross − transport. These are estimates — confirm with actual transport quotes before travelling.
+            * Distance is calculated from your chosen farm location ({effectiveDistrict}). Transport cost = ₹12/km × vehicles needed. Net revenue = gross − transport. Confirm actual transport rates before travelling.
           </p>
         </div>
       )}

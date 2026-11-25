@@ -153,15 +153,18 @@ export const nearby = asyncHandler(async (req, res) => {
   const q = z.object({
     crop: z.string().trim().min(2).max(60),
     quantity: z.coerce.number().positive().max(1_000_000).default(1000),
+    from: z.string().trim().max(60).optional(),
     days: z.coerce.number().int().min(1).max(30).default(7),
     ratePerKm: z.coerce.number().min(1).max(200).default(12),
     vehicleKg: z.coerce.number().min(100).max(30000).default(1000),
   }).parse(req.query);
 
   const profile = req.user.role === 'farmer'
-    ? await FarmerProfile.findOne({ user: req.user._id }, 'district').lean()
+    ? await FarmerProfile.findOne({ user: req.user._id }, 'district village').lean()
     : null;
-  const farmerDistrict = normalizeDistrict(profile?.district);
+  const profileDistrict = normalizeDistrict(profile?.district);
+  const farmerDistrict = normalizeDistrict(q.from) ?? profileDistrict;
+  const isCustomLocation = Boolean(q.from && normalizeDistrict(q.from) && normalizeDistrict(q.from) !== profileDistrict);
   const key = q.crop.toLowerCase();
   const opts = { ratePerKm: q.ratePerKm, vehicleKg: q.vehicleKg };
 
@@ -208,8 +211,15 @@ export const nearby = asyncHandler(async (req, res) => {
   const avgModal = markets.length ? round(markets.reduce((s, m) => s + m.modalPrice, 0) / markets.length, 2) : null;
 
   res.json({
-    crop: q.crop, quantity: q.quantity, farmerDistrict, days: q.days,
-    markets: byValue, byDistance,
+    crop: q.crop,
+    quantity: q.quantity,
+    farmerDistrict,
+    profileDistrict,
+    isCustomLocation,
+    village: profile?.village ?? null,
+    days: q.days,
+    markets: byValue,
+    byDistance,
     recommendation: {
       bestValue: bestValue && { market: bestValue.market, district: bestValue.district, netRevenue: bestValue.netRevenue, distanceKm: bestValue.distanceKm, reason: 'Highest net revenue after transport cost' },
       nearest: nearest && { market: nearest.market, district: nearest.district, netRevenue: nearest.netRevenue, distanceKm: nearest.distanceKm, reason: 'Closest market to your location' },
