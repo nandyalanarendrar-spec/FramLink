@@ -3,7 +3,7 @@ import { protect, authorize, requireEmailVerified, requireApproved } from '../mi
 import { compare, trend, outlook, suggest, crops, districts } from '../controllers/priceController.js';
 
 const router = Router();
-router.use(protect, requireEmailVerified, authorize('farmer'), requireApproved);
+router.use(protect, requireEmailVerified, authorize('farmer', 'buyer'), requireApproved);
 
 router.get('/compare', compare);
 router.get('/trend', trend);

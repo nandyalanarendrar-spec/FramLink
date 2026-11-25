@@ -33,6 +33,7 @@ const navByRole: Record<Role, NavItem[]> = {
   buyer: [
     { to: '/buyer', label: T('Dashboard'), icon: LayoutDashboard, end: true },
     { to: '/buyer/marketplace', label: T('Marketplace'), icon: Store },
+    { to: '/buyer/prices', label: T('Market Prices'), icon: LineChart },
     { to: '/buyer/wanted', label: T('Wanted Crops'), icon: Megaphone },
     { to: '/buyer/insights', label: T('Demand & Supply'), icon: BarChart3 },
     { to: '/buyer/requests', label: T('My Requests'), icon: ClipboardList },

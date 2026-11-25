@@ -81,6 +81,7 @@ export default function App() {
               )}
               {role === 'buyer' && (
                 <>
+                  <Route path="prices" element={<Prices />} />
                   <Route path="marketplace" element={<Marketplace />} />
                   <Route path="marketplace/:id" element={<MarketDetail />} />
                   <Route path="orders" element={<OrderList title={T("Orders & Purchase History")} subtitle={T("Track your orders and see everything you have bought.")} />} />

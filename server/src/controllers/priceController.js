@@ -44,8 +44,11 @@ async function latestPerMarket(cropFilter) {
 
 export const compare = asyncHandler(async (req, res) => {
   const q = compareSchema.parse(req.query);
-  const profile = await FarmerProfile.findOne({ user: req.user._id }, 'district').lean();
-  const fromDistrict = normalizeDistrict(q.from ?? profile?.district);
+  // Farmers have a FarmerProfile with their district; buyers use the district from the query or their User profile
+  const profile = req.user.role === 'farmer'
+    ? await FarmerProfile.findOne({ user: req.user._id }, 'district').lean()
+    : null;
+  const fromDistrict = normalizeDistrict(q.from ?? profile?.district ?? req.user.district);
   const key = q.crop.toLowerCase();
   const opts = { ratePerKm: q.ratePerKm, vehicleKg: q.vehicleKg };
 
