@@ -49,7 +49,6 @@ function googleMapsUrl(farmerDistrict: string | null, market: string, district: 
 }
 
 function RecommendCard({ rec, label, icon: Icon, color }: { rec: Rec; label: string; icon: React.ElementType; color: string }) {
-  const { t } = useTranslation()
   return (
     <div className={`rounded-2xl border-2 ${color} p-4`}>
       <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide">

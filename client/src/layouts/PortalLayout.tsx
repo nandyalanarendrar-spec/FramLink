@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Bell, ClipboardList, Package, HandCoins, LayoutDashboard, LogOut, Menu, Sprout,
-  Store, Truck, User, Users, X, LineChart, ShieldCheck, BarChart3, Flag, Search, Megaphone, ArrowLeft,
+  Store, Truck, User, Users, X, LineChart, ShieldCheck, BarChart3, Flag, Search, Megaphone, ArrowLeft, MapPin,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import Logo from '../components/Logo'
