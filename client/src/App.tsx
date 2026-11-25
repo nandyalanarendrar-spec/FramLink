@@ -25,6 +25,7 @@ import Leftover from './pages/farmer/Leftover'
 import Reports from './pages/admin/Reports'
 import Insights from './pages/Insights'
 import CropForm from './pages/farmer/CropForm'
+import NearbyMarkets from './pages/farmer/NearbyMarkets'
 import Marketplace from './pages/buyer/Marketplace'
 import MarketDetail from './pages/buyer/MarketDetail'
 import RequestList from './pages/RequestList'
@@ -65,6 +66,7 @@ export default function App() {
                 <>
                   <Route path="crops" element={<Crops />} />
                   <Route path="prices" element={<Prices />} />
+                  <Route path="nearby-markets" element={<NearbyMarkets />} />
                   <Route path="insights" element={<Insights />} />
                   <Route path="crops/new" element={<CropForm />} />
                   <Route path="crops/:id/edit" element={<CropForm />} />
@@ -82,6 +84,7 @@ export default function App() {
               {role === 'buyer' && (
                 <>
                   <Route path="prices" element={<Prices />} />
+                  <Route path="nearby-markets" element={<NearbyMarkets />} />
                   <Route path="marketplace" element={<Marketplace />} />
                   <Route path="marketplace/:id" element={<MarketDetail />} />
                   <Route path="orders" element={<OrderList title={T("Orders & Purchase History")} subtitle={T("Track your orders and see everything you have bought.")} />} />

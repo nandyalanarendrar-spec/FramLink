@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { protect, authorize, requireEmailVerified, requireApproved } from '../middleware/auth.js';
-import { compare, trend, outlook, suggest, crops, districts } from '../controllers/priceController.js';
+import { compare, trend, outlook, suggest, crops, districts, nearby } from '../controllers/priceController.js';
 
 const router = Router();
 router.use(protect, requireEmailVerified, authorize('farmer', 'buyer'), requireApproved);
@@ -11,5 +11,6 @@ router.get('/outlook', outlook);
 router.get('/suggest', suggest);
 router.get('/crops', crops);
 router.get('/districts', districts);
+router.get('/nearby', nearby);
 
 export default router;

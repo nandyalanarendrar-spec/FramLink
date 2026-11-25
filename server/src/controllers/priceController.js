@@ -6,7 +6,6 @@ import FarmerProfile from '../models/FarmerProfile.js';
 import { asyncHandler } from '../utils/AppError.js';
 import { AP_DISTRICTS, normalizeDistrict, roadDistanceKm } from '../utils/geo.js';
 import { liveFilter } from '../utils/listing.js';
-
 const FRESH_DAYS = 14; // price rows older than this are not used for comparison
 const STALE_AFTER_DAYS = 3; // warn when the newest price is older than this
 const BASE_TRIP = 200; // minimum charge for one vehicle trip (₹)
@@ -148,6 +147,77 @@ export const crops = asyncHandler(async (_req, res) => {
 });
 
 export const districts = (_req, res) => res.json({ districts: Object.keys(AP_DISTRICTS).sort() });
+
+// ── Nearby markets: all markets for a crop sorted by distance from farmer's district ──
+export const nearby = asyncHandler(async (req, res) => {
+  const q = z.object({
+    crop: z.string().trim().min(2).max(60),
+    quantity: z.coerce.number().positive().max(1_000_000).default(1000),
+    days: z.coerce.number().int().min(1).max(30).default(7),
+    ratePerKm: z.coerce.number().min(1).max(200).default(12),
+    vehicleKg: z.coerce.number().min(100).max(30000).default(1000),
+  }).parse(req.query);
+
+  const profile = req.user.role === 'farmer'
+    ? await FarmerProfile.findOne({ user: req.user._id }, 'district').lean()
+    : null;
+  const farmerDistrict = normalizeDistrict(profile?.district);
+  const key = q.crop.toLowerCase();
+  const opts = { ratePerKm: q.ratePerKm, vehicleKg: q.vehicleKg };
+
+  const rows = await latestPerMarket(key);
+
+  // Per-market daily trend for the requested window (sparkline + weekly analysis)
+  const trendAgg = await MarketPrice.aggregate([
+    { $match: { cropKey: key, date: { $gte: since(q.days) } } },
+    { $group: { _id: { market: '$market', date: '$date' }, price: { $avg: '$modalPrice' } } },
+    { $sort: { '_id.date': 1 } },
+    { $group: { _id: '$_id.market', trend: { $push: { date: '$_id.date', price: '$price' } } } },
+  ]);
+  const trendMap = Object.fromEntries(trendAgg.map((t) => [t._id, t.trend]));
+
+  const markets = rows.map((r) => {
+    const distanceKm = farmerDistrict ? roadDistanceKm(farmerDistrict, r.district) : null;
+    const transport = transportCost(distanceKm, q.quantity, opts);
+    const gross = round(q.quantity * r.modalPrice, 0);
+    const net = transport == null ? null : round(gross - transport, 0);
+    const trend = trendMap[r.market] ?? [];
+    const trendPct = trend.length >= 2
+      ? round(((trend[trend.length - 1].price - trend[0].price) / trend[0].price) * 100, 1)
+      : null;
+    const distCoords = AP_DISTRICTS[normalizeDistrict(r.district)] ?? null;
+    return {
+      market: r.market, district: r.district, minPrice: r.minPrice,
+      modalPrice: r.modalPrice, maxPrice: r.maxPrice, date: r.date, source: r.source,
+      distanceKm, transportCost: transport, grossRevenue: gross, netRevenue: net,
+      trend, trendPct, coords: distCoords,
+    };
+  });
+
+  const byValue = [...markets].sort((a, b) => (b.netRevenue ?? -Infinity) - (a.netRevenue ?? -Infinity));
+  const byDistance = [...markets].filter((m) => m.distanceKm != null).sort((a, b) => a.distanceKm - b.distanceKm);
+  const bestValue = byValue.find((m) => m.netRevenue != null) ?? null;
+  const nearest = byDistance[0] ?? null;
+  const top3 = byValue.filter((m) => m.netRevenue != null).slice(0, 3);
+  const smartPick = top3.length
+    ? top3.reduce((a, b) => ((a.distanceKm ?? Infinity) <= (b.distanceKm ?? Infinity) ? a : b))
+    : bestValue;
+
+  const risingCount = markets.filter((m) => (m.trendPct ?? 0) > 2).length;
+  const fallingCount = markets.filter((m) => (m.trendPct ?? 0) < -2).length;
+  const avgModal = markets.length ? round(markets.reduce((s, m) => s + m.modalPrice, 0) / markets.length, 2) : null;
+
+  res.json({
+    crop: q.crop, quantity: q.quantity, farmerDistrict, days: q.days,
+    markets: byValue, byDistance,
+    recommendation: {
+      bestValue: bestValue && { market: bestValue.market, district: bestValue.district, netRevenue: bestValue.netRevenue, distanceKm: bestValue.distanceKm, reason: 'Highest net revenue after transport cost' },
+      nearest: nearest && { market: nearest.market, district: nearest.district, netRevenue: nearest.netRevenue, distanceKm: nearest.distanceKm, reason: 'Closest market to your location' },
+      smartPick: smartPick && { market: smartPick.market, district: smartPick.district, netRevenue: smartPick.netRevenue, distanceKm: smartPick.distanceKm, reason: 'Best balance of price and distance' },
+    },
+    weeklyInsights: { risingCount, fallingCount, totalMarkets: markets.length, avgModal },
+  });
+});
 
 // Rule-based "when to sell" from the last 60 days of mandi prices. History, not a forecast.
 const dailyAverages = (match) =>

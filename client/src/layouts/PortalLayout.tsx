@@ -23,6 +23,7 @@ const navByRole: Record<Role, NavItem[]> = {
     { to: '/farmer/requests', label: T('Buyer Requests'), icon: ClipboardList },
     { to: '/farmer/orders', label: T('Orders'), icon: Package },
     { to: '/farmer/prices', label: T('Price Comparison'), icon: LineChart },
+    { to: '/farmer/nearby-markets', label: T('Find Nearby Markets'), icon: MapPin },
     { to: '/farmer/insights', label: T('Demand & Supply'), icon: BarChart3 },
     { to: '/farmer/sales', label: T('Sales History'), icon: HandCoins },
     { to: '/farmer/vehicles', label: T('Find Vehicles'), icon: Search },
