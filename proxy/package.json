@@ -1,0 +1,6 @@
+{
+  "name": "farmlink-mumbai-proxy",
+  "version": "1.0.0",
+  "description": "Mumbai (bom1) proxy for data.gov.in mandi prices",
+  "type": "module"
+}
