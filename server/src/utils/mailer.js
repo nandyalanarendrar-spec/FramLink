@@ -32,13 +32,19 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 async function sendViaBrevo({ to, subject, text, html }) {
   const sender = parseFrom(process.env.MAIL_FROM);
   if (!sender.email) throw new Error('MAIL_FROM must be set to a sender you verified in Brevo');
+  console.log(`[brevo] sending "${subject}" to ${to} from ${sender.email}`);
   const res = await fetch(process.env.BREVO_API_URL || 'https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: { 'api-key': process.env.BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
     body: JSON.stringify({ sender, to: [{ email: to }], subject, textContent: text, htmlContent: html }),
     signal: AbortSignal.timeout(10_000),
   });
-  if (!res.ok) throw new Error(`Brevo answered ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const body = await res.text();
+  if (!res.ok) {
+    console.error(`[brevo] FAILED ${res.status}: ${body.slice(0, 400)}`);
+    throw new Error(`Brevo answered ${res.status}: ${body.slice(0, 200)}`);
+  }
+  console.log(`[brevo] sent OK (${res.status}): ${body.slice(0, 100)}`);
 }
 
 async function send(mail) {
