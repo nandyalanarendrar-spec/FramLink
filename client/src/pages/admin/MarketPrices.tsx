@@ -16,7 +16,7 @@ interface Status {
 }
 
 const empty = { crop: '', market: '', district: '', minPrice: '', maxPrice: '', modalPrice: '', date: new Date().toISOString().slice(0, 10) }
-const LOCAL_CMD = 'cd server && npm run import:prices'
+const LOCAL_CMD = 'npm run import:prices'
 
 export default function MarketPrices() {
   const [status, setStatus] = useState<Status | null>(null)
