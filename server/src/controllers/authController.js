@@ -100,16 +100,13 @@ async function deliver(send) {
 }
 
 // Generates a fresh OTP, stores only its hash, and emails it.
-// Returns devOtp if email delivery failed or SMTP is not configured, so users are never locked out.
+// In production or when mail is configured, the code is NEVER returned to the client.
 async function issueOtp(user) {
   const otp = String(crypto.randomInt(100000, 1000000));
   user.emailOtp = { hash: hashOtp(otp), expiresAt: new Date(Date.now() + OTP_TTL_MS), attempts: 0, lastSentAt: new Date() };
   await user.save();
   const emailSent = await deliver(() => sendCodeEmail(user.email, user.name, otp, 'verify'));
-  // If email was delivered successfully, emailSent is true.
-  // If email failed to send (e.g. cloud hosting provider blocks port 587 on free tier),
-  // return devOtp so the user can see the code and complete verification without getting stuck!
-  const fallback = !emailSent ? { devOtp: otp, mailFailed: true } : {};
+  const fallback = !emailSent ? { mailFailed: true } : {};
   return { ...devCode(otp), ...fallback, emailSent };
 }
 
@@ -196,7 +193,7 @@ export const forgotPassword = asyncHandler(async (req, res) => {
     user.passwordReset = { hash: hashOtp(code), expiresAt: new Date(Date.now() + RESET_TTL_MS), attempts: 0, lastSentAt: new Date() };
     await user.save();
     const emailSent = await deliver(() => sendCodeEmail(user.email, user.name, code, 'reset'));
-    extra = !emailSent ? { devCode: code, devOtp: code, mailFailed: true } : devCode(code);
+    extra = !emailSent ? { mailFailed: true, ...devCode(code) } : devCode(code);
   }
   res.json({ message: GENERIC_FORGOT, ...extra });
 });
