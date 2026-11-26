@@ -71,8 +71,9 @@ export const importPrices = asyncHandler(async (_req, res) => {
   } catch (err) {
     // data.gov.in is geo-blocked from Render's US servers.
     // Return a structured response so the admin UI can show a helpful command.
-    if (err.message?.includes('data.gov.in') || err.message?.includes('fetch failed')) {
-      return res.status(503).json({ ok: false, geoBlocked: true, message: err.message });
+    if (err.message?.includes('data.gov.in') || err.message?.includes('fetch failed') || err.message?.includes('Could not reach')) {
+      // Return 200 so the browser/axios doesn't treat it as an error — the UI checks data.geoBlocked
+      return res.status(200).json({ ok: false, geoBlocked: true, message: err.message });
     }
     throw err;
   }
