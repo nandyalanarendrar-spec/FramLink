@@ -60,12 +60,20 @@ export async function importAgmarknet({ fetchImpl = fetch } = {}) {
   let seen = 0;
   const ops = [];
   for (let page = 0; page < MAX_PAGES; page++) {
-    const url = new URL(`https://api.data.gov.in/resource/${RESOURCE_ID}`);
+    const baseUrl = (process.env.DATA_GOV_BASE_URL || 'https://api.data.gov.in').replace(/\/+$/, '');
+    const url = new URL(`${baseUrl}/resource/${RESOURCE_ID}`);
     url.search = new URLSearchParams({ 'api-key': apiKey, format: 'json', limit: String(PAGE), offset: String(page * PAGE), 'filters[state.keyword]': 'Andhra Pradesh' }).toString();
 
     let body;
     try {
-      const res = await fetchImpl(url);
+      const res = await fetchImpl(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'en-IN,en;q=0.9',
+        },
+        signal: AbortSignal.timeout(15_000),
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       body = await res.json();
     } catch (err) {
