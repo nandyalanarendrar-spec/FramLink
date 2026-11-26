@@ -126,6 +126,23 @@ export const register = asyncHandler(async (req, res) => {
     req.body.phone = raw.length > 10 && raw.startsWith('91') ? raw.slice(2, 12) : raw.slice(-10);
   }
   const data = registerSchema.parse(req.body);
+
+  // Check if an account already exists with this phone or email
+  const existing = await User.findOne({
+    $or: [{ phone: data.phone }, { email: data.email.toLowerCase() }],
+  });
+
+  if (existing) {
+    if (existing.emailVerified) {
+      if (existing.phone === data.phone) throw new AppError('Mobile number is already registered', 400);
+      throw new AppError('Email is already registered', 400);
+    }
+    // Previous registration was never verified (e.g. OTP failed or abandoned)
+    // Clean it up so the user can re-register cleanly without being blocked!
+    await FarmerProfile.deleteMany({ user: existing._id });
+    await User.deleteOne({ _id: existing._id });
+  }
+
   const user = await User.create({
     name: data.name,
     phone: data.phone,
@@ -143,7 +160,16 @@ export const register = asyncHandler(async (req, res) => {
   if (data.role === 'farmer') {
     await FarmerProfile.create({ user: user._id, district: data.district, village: data.village });
   }
+
   const extra = await issueOtp(user);
+  if (extra.mailFailed) {
+    // If sending OTP failed, DO NOT keep the user in the database!
+    // Delete immediately so no unverified or failed records remain in DB.
+    await FarmerProfile.deleteMany({ user: user._id });
+    await User.deleteOne({ _id: user._id });
+    throw new AppError('Could not send verification email. Please check your email address or try again.', 502);
+  }
+
   sendToken(res, user, 201, extra);
 });
 
@@ -277,7 +303,13 @@ export const verifyEmail = asyncHandler(async (req, res) => {
 
   const rec = user.emailOtp;
   if (!rec?.hash || rec.expiresAt < new Date()) throw new AppError('Code expired. Please request a new one.', 400);
-  if (rec.attempts >= MAX_OTP_ATTEMPTS) throw new AppError('Too many wrong attempts. Please request a new code.', 429);
+  if (rec.attempts >= MAX_OTP_ATTEMPTS) {
+    // Too many wrong attempts: delete unverified user from DB and cancel registration
+    await FarmerProfile.deleteMany({ user: user._id });
+    await User.deleteOne({ _id: user._id });
+    res.clearCookie('token', { ...cookieOptions(), maxAge: undefined });
+    throw new AppError('Too many failed OTP attempts. Registration cancelled. Please register again.', 429);
+  }
 
   const ok = crypto.timingSafeEqual(Buffer.from(hashOtp(otp)), Buffer.from(rec.hash));
   if (!ok) {
@@ -304,9 +336,22 @@ export const resendOtp = asyncHandler(async (req, res) => {
   res.json({ message: 'Verification code sent', ...extra });
 });
 
-export const logout = (_req, res) => {
+export const logout = asyncHandler(async (req, res) => {
+  try {
+    const token = req.cookies?.token;
+    if (token) {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded?.id) {
+        const u = await User.findById(decoded.id);
+        if (u && !u.emailVerified) {
+          await FarmerProfile.deleteMany({ user: u._id });
+          await User.deleteOne({ _id: u._id });
+        }
+      }
+    }
+  } catch {}
   res.clearCookie('token', { ...cookieOptions(), maxAge: undefined });
   res.json({ message: 'Logged out' });
-};
+});
 
 export const me = (req, res) => res.json({ user: publicUser(req.user) });
