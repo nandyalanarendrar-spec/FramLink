@@ -61,15 +61,17 @@ export default function VerifyEmail() {
       <h1 className="mt-5 text-3xl font-bold text-slate-900">{t('Verify your email')}</h1>
       <p className="mt-1 text-slate-500">{t('We sent a 6-digit code to {{email}}. It expires in 10 minutes.', { email: user.email })}</p>
 
-      {mailFailed && (
-        <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{t('We could not send the email right now. Wait a minute and tap “Resend code”.')}</p>
-      )}
-
-      {devOtp && (
-        <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          {t('Dev mode: email sending is not configured on the server, so your code is {{code}}.', { code: devOtp })}
+      {devOtp ? (
+        <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-bold text-amber-950">{t('Your verification code:')}</p>
+          <p className="mt-1 font-mono text-3xl font-extrabold tracking-widest text-amber-950">{devOtp}</p>
+          <p className="mt-1 text-xs text-amber-700">{t('Enter this 6-digit code below to activate your account.')}</p>
+        </div>
+      ) : mailFailed ? (
+        <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {t('We could not send the email right now. Please wait a minute and tap “Resend code”.')}
         </p>
-      )}
+      ) : null}
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <input

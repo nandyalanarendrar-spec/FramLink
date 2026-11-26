@@ -24,7 +24,12 @@ export default function Login() {
     setError('')
     setBusy(true)
     try {
-      const u = await login(identifier.trim(), password)
+      const raw = identifier.trim()
+      // If user typed mobile number with +91, 0, spaces, or dashes, clean it
+      const sanitized = raw.includes('@')
+        ? raw.toLowerCase()
+        : raw.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '').replace(/^0(?=\d{10}$)/, '')
+      const u = await login(sanitized, password)
       navigate(landingPathFor(u), { replace: true })
     } catch (err) {
       setError(errorMessage(err))

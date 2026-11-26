@@ -24,7 +24,7 @@ const empty = {
   vehicleType: '', vehicleNumber: '', vehicleCapacityKg: '',
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
       <label className="mb-1 block text-sm font-medium">{label}</label>
@@ -51,10 +51,38 @@ export default function Register() {
   const set = (k: keyof typeof empty) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }))
 
+  const handlePhone = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let digits = e.target.value.replace(/\D/g, '')
+    // Auto-clean pasted numbers with country code: +91 9014220155 -> 9014220155
+    if (digits.length === 12 && digits.startsWith('91')) {
+      digits = digits.slice(2)
+    } else if (digits.length === 11 && digits.startsWith('0')) {
+      digits = digits.slice(1)
+    }
+    setForm((f) => ({ ...f, phone: digits.slice(0, 10) }))
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
-    if (form.password !== form.confirm) return setError(t('Passwords do not match'))
+
+    // Client-side validations with clear explanations
+    if (form.phone.length !== 10) {
+      return setError(t('Please enter a full 10-digit mobile number (e.g. 9014220155). You entered {{n}} digits.', { n: form.phone.length }))
+    }
+    if (!/^[6-9]\d{9}$/.test(form.phone)) {
+      return setError(t('Mobile number must start with 6, 7, 8, or 9.'))
+    }
+    if (form.password.length < 8) {
+      return setError(t('Password must be at least 8 characters.'))
+    }
+    if (!/[A-Za-z]/.test(form.password) || !/[0-9]/.test(form.password)) {
+      return setError(t('Password must include at least one letter and at least one number.'))
+    }
+    if (form.password !== form.confirm) {
+      return setError(t('Passwords do not match'))
+    }
+
     setBusy(true)
     try {
       const base = { name: form.name.trim(), phone: form.phone.trim(), email: form.email.trim(), password: form.password, role }
@@ -98,7 +126,29 @@ export default function Register() {
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <Field label={t('Full name')}><input className="input" value={form.name} onChange={set('name')} required minLength={2} /></Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t('Mobile number')}><input className="input" value={form.phone} onChange={set('phone')} inputMode="numeric" maxLength={10} placeholder={t('10 digits')} required /></Field>
+          <Field
+            label={
+              <span className="flex items-center justify-between">
+                <span>{t('Mobile number')}</span>
+                {form.phone.length > 0 && form.phone.length < 10 && (
+                  <span className="text-xs font-normal text-amber-600">({form.phone.length}/10 digits)</span>
+                )}
+                {form.phone.length === 10 && (
+                  <span className="text-xs font-normal text-green-600">✓ 10 digits</span>
+                )}
+              </span>
+            }
+          >
+            <input
+              className="input"
+              value={form.phone}
+              onChange={handlePhone}
+              inputMode="numeric"
+              maxLength={10}
+              placeholder="9876543210"
+              required
+            />
+          </Field>
           <Field label={t('Email')}><input className="input" type="email" value={form.email} onChange={set('email')} placeholder="you@email.com" required /></Field>
         </div>
 
@@ -131,10 +181,10 @@ export default function Register() {
         )}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t('Password')}><input className="input" type="password" value={form.password} onChange={set('password')} minLength={8} required /></Field>
-          <Field label={t('Confirm password')}><input className="input" type="password" value={form.confirm} onChange={set('confirm')} required /></Field>
+          <Field label={t('Password')}><input className="input" type="password" value={form.password} onChange={set('password')} minLength={8} placeholder="At least 8 chars" required /></Field>
+          <Field label={t('Confirm password')}><input className="input" type="password" value={form.confirm} onChange={set('confirm')} placeholder="Re-type password" required /></Field>
         </div>
-        <p className="text-xs text-slate-500">{t('Password: minimum 8 characters.')}</p>
+        <p className="text-xs text-slate-500">{t('Password must be at least 8 characters, with at least one letter and one number.')}</p>
 
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         <button className="btn-primary w-full py-3 text-base" disabled={busy}>{busy ? t('Creating account…') : t('Register')}</button>

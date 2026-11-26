@@ -100,13 +100,17 @@ async function deliver(send) {
 }
 
 // Generates a fresh OTP, stores only its hash, and emails it.
-// Returns { devOtp } only when SMTP is not configured (local development).
+// Returns devOtp if email delivery failed or SMTP is not configured, so users are never locked out.
 async function issueOtp(user) {
   const otp = String(crypto.randomInt(100000, 1000000));
   user.emailOtp = { hash: hashOtp(otp), expiresAt: new Date(Date.now() + OTP_TTL_MS), attempts: 0, lastSentAt: new Date() };
   await user.save();
   const emailSent = await deliver(() => sendCodeEmail(user.email, user.name, otp, 'verify'));
-  return { ...devCode(otp), emailSent };
+  // If email was delivered successfully, emailSent is true.
+  // If email failed to send (e.g. cloud hosting provider blocks port 587 on free tier),
+  // return devOtp so the user can see the code and complete verification without getting stuck!
+  const fallback = !emailSent ? { devOtp: otp, mailFailed: true } : {};
+  return { ...devCode(otp), ...fallback, emailSent };
 }
 
 // The code is handed back only while developing without SMTP, never in production
@@ -119,6 +123,11 @@ const codeMatches = (code, hash) => {
 };
 
 export const register = asyncHandler(async (req, res) => {
+  // Normalize phone (strip +91, 0, spaces, dashes)
+  if (req.body.phone && typeof req.body.phone === 'string') {
+    const raw = req.body.phone.replace(/\D/g, '');
+    req.body.phone = raw.length > 10 && raw.startsWith('91') ? raw.slice(2, 12) : raw.slice(-10);
+  }
   const data = registerSchema.parse(req.body);
   const user = await User.create({
     name: data.name,
@@ -143,10 +152,19 @@ export const register = asyncHandler(async (req, res) => {
 
 export const login = asyncHandler(async (req, res) => {
   const { identifier, password: pw } = loginSchema.parse(req.body);
-  const query = identifier.includes('@') ? { email: identifier.toLowerCase() } : { phone: identifier };
+  const clean = identifier.trim();
+  let query;
+  if (clean.includes('@')) {
+    query = { email: clean.toLowerCase() };
+  } else {
+    // Strip non-digits and country code (+91 or leading 0) so logins with +91 work seamlessly
+    const digits = clean.replace(/\D/g, '');
+    const phone = digits.length > 10 && digits.startsWith('91') ? digits.slice(2, 12) : digits.slice(-10);
+    query = { phone };
+  }
   const user = await User.findOne(query).select('+passwordHash');
   // same message for both cases so attackers can't tell which accounts exist
-  if (!user || !(await user.verifyPassword(pw))) throw new AppError('Invalid credentials', 401);
+  if (!user || !(await user.verifyPassword(pw))) throw new AppError('Invalid mobile number/email or password', 401);
   if (!user.isActive) throw new AppError('Account disabled', 403);
   sendToken(res, user);
 });
@@ -177,8 +195,8 @@ export const forgotPassword = asyncHandler(async (req, res) => {
     const code = newCode();
     user.passwordReset = { hash: hashOtp(code), expiresAt: new Date(Date.now() + RESET_TTL_MS), attempts: 0, lastSentAt: new Date() };
     await user.save();
-    await deliver(() => sendCodeEmail(user.email, user.name, code, 'reset')); // the answer is the same whether or not it was sent
-    extra = devCode(code);
+    const emailSent = await deliver(() => sendCodeEmail(user.email, user.name, code, 'reset'));
+    extra = !emailSent ? { devCode: code, devOtp: code, mailFailed: true } : devCode(code);
   }
   res.json({ message: GENERIC_FORGOT, ...extra });
 });

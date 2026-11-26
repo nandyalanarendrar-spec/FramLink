@@ -30,5 +30,7 @@ services:
         sync: false
       - key: MAIL_FROM
         sync: false
+      - key: BREVO_API_KEY
+        sync: false
       - key: DATA_GOV_API_KEY
         sync: false
